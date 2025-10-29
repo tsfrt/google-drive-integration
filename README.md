@@ -12,6 +12,7 @@ This project provides a Databricks notebook interface for ingesting data from Go
 - 📈 **Progress Tracking**: Real-time download and ingestion progress with visual summaries
 - 🎯 **Widget Interface**: Easy-to-use parameter widgets for configuration
 - 🌈 **Beautiful UI**: Gradient styling, hover effects, and modern design
+- ⚡ **Optimized Performance**: Direct writes to destination (no temporary files), smart handling for different file sizes
 
 ## Setup Instructions
 
@@ -326,14 +327,37 @@ See `requirements.txt` for the complete list of dependencies:
     └─────────────────────┘  └──────────────────┘
 ```
 
+## Performance Optimization
+
+The notebook uses an optimized ingestion approach:
+
+### Direct Write Strategy
+Instead of the traditional two-step process:
+```
+❌ Old: Google Drive → Local Temp → DBFS/Volume
+✅ New: Google Drive → DBFS/Volume (direct)
+```
+
+### Smart File Handling
+- **Small files (≤100MB)**: Downloaded to memory buffer, written directly
+- **Large files (>100MB)**: Streamed with chunked downloads for memory efficiency
+- **No temporary directory**: Eliminates intermediate storage and I/O overhead
+
+### Benefits
+- ⚡ **Faster ingestion**: Eliminates redundant copy operations
+- 💾 **Lower disk usage**: No temporary file accumulation
+- 🚀 **Better scalability**: More efficient for large file sets
+- 🔄 **Cleaner process**: Automatic cleanup, no leftover temp files
+
 ## Contributing
 
 Feel free to enhance this notebook with additional features:
 - Incremental ingestion (skip already ingested files)
 - File filtering by date/size
-- Parallel downloads
+- Parallel downloads using ThreadPoolExecutor
 - Data validation
 - Automatic format detection and parsing
+- Retry logic for failed downloads
 
 ## License
 

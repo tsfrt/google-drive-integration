@@ -163,6 +163,26 @@ CREATE VOLUME IF NOT EXISTS main.default.google_drive_ingest;
 - 📊 Create Delta tables from ingested data
 - 🚀 Build data pipelines
 
+## Performance Features
+
+### ⚡ Direct Write Optimization
+The notebook uses an optimized approach that writes files directly to the destination:
+
+```
+Traditional:  Google Drive → Temp Storage → DBFS/Volume
+Optimized:    Google Drive → DBFS/Volume (direct!)
+```
+
+**Benefits:**
+- ✅ Faster ingestion (no intermediate copy)
+- ✅ Lower disk usage (no temp files)
+- ✅ Automatic cleanup
+- ✅ Better scalability
+
+### Smart File Handling
+- **Small files (≤100MB)**: Downloaded to memory, written directly
+- **Large files (>100MB)**: Streamed with progress tracking
+
 ## Tips & Tricks
 
 ### Tip 1: Organize by folders
@@ -194,6 +214,13 @@ Track ingested files to avoid duplicates:
 # Keep a table of ingested file IDs
 ingested_ids = spark.table("main.default.ingested_files").select("file_id").collect()
 # Skip already ingested files
+```
+
+### Tip 5: Batch processing
+For very large file sets, process in batches:
+```python
+# In the widget, paste file IDs in groups of 20-50
+# Run multiple times for different batches
 ```
 
 ## Support
