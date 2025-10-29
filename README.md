@@ -1,15 +1,17 @@
-# Google Drive to Databricks Ingestion
+# Google Drive to Databricks Ingestion 📁 ➡️ 💾
 
-This project provides a Databricks notebook interface for ingesting data from Google Drive into Databricks File System (DBFS) with a user-friendly widget-based interface.
+This project provides a Databricks notebook interface for ingesting data from Google Drive into **Unity Catalog Volumes** or **DBFS** with a beautiful **visual file browser** and interactive selection interface.
 
-## Features
+## ✨ Features
 
+- 🎨 **Visual File Browser**: Interactive HTML table with checkboxes for easy file selection
 - 🔐 **Secure Authentication**: Uses Databricks secrets for Google Drive credentials
-- 📁 **File Browser**: Lists files and folders from Google Drive
-- ✅ **Selective Ingestion**: Choose specific files to ingest
+- 💾 **Flexible Storage**: Save to Unity Catalog Volumes or DBFS
+- ✅ **Interactive Selection**: Click checkboxes and copy file IDs with one button
 - 📊 **Multiple File Types**: Supports Google Workspace files (Docs, Sheets, Slides) and regular files
-- 📈 **Progress Tracking**: Real-time download and ingestion progress
+- 📈 **Progress Tracking**: Real-time download and ingestion progress with visual summaries
 - 🎯 **Widget Interface**: Easy-to-use parameter widgets for configuration
+- 🌈 **Beautiful UI**: Gradient styling, hover effects, and modern design
 
 ## Setup Instructions
 
@@ -94,42 +96,71 @@ Once the notebook is imported and attached to a cluster, run the first few cells
    - To get a folder ID:
      - Open the folder in Google Drive
      - Copy the ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`
-4. **Output DBFS Path**: Specify where to store ingested files (e.g., `/mnt/ingest/google_drive`)
-5. **Action**: Select `list_files`
+4. **File IDs to Ingest**: Leave empty for now (will be populated via visual interface)
+5. **Storage Type**: Choose `volume` for Unity Catalog Volumes or `dbfs` for DBFS
+6. **Output Path**: 
+   - For Volumes: `/Volumes/catalog/schema/volume/google_drive`
+   - For DBFS: `/mnt/ingest/google_drive`
+7. **Action**: Select `list_files`
 
-### Step 2: List Files
+### Step 2: Browse Files with Visual Interface
 
 1. Set the "Action" widget to `list_files`
 2. Run the notebook cells
-3. Review the displayed table of files with:
-   - File type icons
-   - File names
-   - File IDs
-   - File sizes
-   - Modification dates
+3. You'll see a beautiful interactive table with:
+   - ✅ **Checkboxes** for each file
+   - 📁 **File type icons** (folders, documents, spreadsheets, etc.)
+   - 📝 **File names** and metadata
+   - 📊 **File sizes** in MB
+   - 📅 **Last modified dates**
+   - 🆔 **File IDs** (for reference)
 
-### Step 3: Select and Ingest Files
+### Step 3: Select Files Interactively
 
-1. Copy the File IDs of the files you want to ingest from the displayed table
-2. Paste them into the "File IDs to Ingest" widget (comma-separated)
-   - Example: `1abc123def456, 2xyz789ghi012, 3pqr345stu678`
-3. Change the "Action" widget to `ingest_files`
-4. Run the notebook cells
-5. Monitor the progress as files are downloaded and copied to DBFS
+1. **Click checkboxes** next to the files you want to ingest
+   - Use the checkbox in the header to select/deselect all files
+   - The selected count updates automatically
+2. **Click the "Copy Selected File IDs" button**
+   - File IDs are automatically copied to your clipboard
+   - You'll see a confirmation message
+3. **Paste** the copied IDs into the "File IDs to Ingest" widget
 
-### Step 4: Access Ingested Data
+### Step 4: Ingest Files
 
-After ingestion, your files will be available in the specified DBFS path. You can:
+1. Change the "Action" widget to `ingest_files`
+2. Run the notebook cells
+3. Monitor the progress:
+   - Real-time download progress for each file
+   - Visual summary card showing success/failure counts
+   - Detailed table of all ingested files
+4. Files are automatically saved to your chosen destination (Volume or DBFS)
 
+### Step 5: Access Ingested Data
+
+After ingestion, your files will be available in the specified location. The notebook automatically displays a visual list of all ingested files.
+
+#### From Unity Catalog Volume:
 ```python
-# List ingested files
-dbutils.fs.ls("/mnt/ingest/google_drive")
+# List files in volume
+dbutils.fs.ls("/Volumes/catalog/schema/volume/google_drive")
 
-# Read CSV files
-df = spark.read.csv("/mnt/ingest/google_drive/your_file.csv", header=True, inferSchema=True)
+# Read CSV from volume
+df = spark.read.csv("/Volumes/catalog/schema/volume/google_drive/your_file.csv", 
+                    header=True, inferSchema=True)
 display(df)
 
-# Read other file types as needed
+# Create Delta table from volume
+df.write.format("delta").mode("overwrite").saveAsTable("catalog.schema.table_name")
+```
+
+#### From DBFS:
+```python
+# List files in DBFS
+dbutils.fs.ls("/mnt/ingest/google_drive")
+
+# Read CSV from DBFS
+df = spark.read.csv("/mnt/ingest/google_drive/your_file.csv", header=True, inferSchema=True)
+display(df)
 ```
 
 ## File Type Support
@@ -228,41 +259,71 @@ See `requirements.txt` for the complete list of dependencies:
 - `pydrive2` - Additional Google Drive utilities
 - `pandas` - Data manipulation
 
+## Unity Catalog Volumes vs DBFS
+
+### Unity Catalog Volumes (Recommended)
+- ✅ **Better governance**: Full Unity Catalog integration
+- ✅ **Fine-grained access control**: User/group level permissions
+- ✅ **Better organization**: Catalog → Schema → Volume hierarchy
+- ✅ **Audit logging**: Complete lineage and access tracking
+- ✅ **Future-proof**: Databricks' recommended storage approach
+
+**Path format**: `/Volumes/catalog/schema/volume_name/folder`
+
+### DBFS (Legacy)
+- ⚠️ **Simpler setup**: No Unity Catalog setup required
+- ⚠️ **Less governance**: Basic file system permissions
+- ⚠️ **Legacy approach**: May be deprecated in future
+
+**Path format**: `/mnt/folder` or `/dbfs/path`
+
 ## Architecture
 
 ```
-┌─────────────────┐
-│  Google Drive   │
-│                 │
-│  ┌──────────┐  │
-│  │  Files   │  │
-│  └────┬─────┘  │
-└───────┼────────┘
-        │
-        │ Google Drive API
-        │
-┌───────▼────────────────────────────────┐
-│        Databricks Notebook             │
-│  ┌──────────────────────────────────┐ │
-│  │  Widget Interface                │ │
-│  │  - Secret Configuration          │ │
-│  │  - File Selection                │ │
-│  └──────────────────────────────────┘ │
-│  ┌──────────────────────────────────┐ │
-│  │  Ingestion Engine                │ │
-│  │  - Authentication                │ │
-│  │  - File Listing                  │ │
-│  │  - Download & Transfer           │ │
-│  └──────────────────────────────────┘ │
-└────────────┬───────────────────────────┘
+┌─────────────────────────────────┐
+│       Google Drive              │
+│                                 │
+│  📁 Folders & Files             │
+│  - Documents (→ .docx)          │
+│  - Spreadsheets (→ .csv)        │
+│  - Presentations (→ .pptx)      │
+│  - Regular files                │
+└────────────┬────────────────────┘
+             │ Google Drive API
+             │ (Service Account Auth)
              │
-             │
-      ┌──────▼──────┐
-      │    DBFS     │
-      │             │
-      │ Ingested    │
-      │   Files     │
-      └─────────────┘
+┌────────────▼─────────────────────────────────┐
+│      Databricks Notebook                     │
+│                                              │
+│  ┌────────────────────────────────────────┐ │
+│  │  🎨 Visual Widget Interface            │ │
+│  │  - Interactive file browser            │ │
+│  │  - Checkbox selection                  │ │
+│  │  - One-click copy file IDs             │ │
+│  │  - Storage type selection              │ │
+│  └────────────────────────────────────────┘ │
+│                                              │
+│  ┌────────────────────────────────────────┐ │
+│  │  🔧 Ingestion Engine                   │ │
+│  │  - Google Drive authentication         │ │
+│  │  - File listing & metadata             │ │
+│  │  - Download & transfer                 │ │
+│  │  - Progress tracking                   │ │
+│  └────────────────────────────────────────┘ │
+└──────────────┬───────────────────────────────┘
+               │
+               ├──────────────────┬─────────────────
+               │                  │
+    ┌──────────▼──────────┐  ┌───▼──────────────┐
+    │  Unity Catalog      │  │      DBFS        │
+    │    Volumes          │  │   (Legacy)       │
+    │                     │  │                  │
+    │ /Volumes/catalog/   │  │  /mnt/path       │
+    │   schema/volume/    │  │  /dbfs/path      │
+    │                     │  │                  │
+    │ 🔒 Governed         │  │ 📁 Simple        │
+    │ 📊 Delta Tables     │  │ 📄 Files         │
+    └─────────────────────┘  └──────────────────┘
 ```
 
 ## Contributing

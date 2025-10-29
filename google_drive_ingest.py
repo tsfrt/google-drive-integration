@@ -1,20 +1,29 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Google Drive Data Ingestion
+# MAGIC # Google Drive Data Ingestion 📁 ➡️ 💾
 # MAGIC 
-# MAGIC This notebook provides an interface to ingest data from Google Drive into Databricks.
+# MAGIC This notebook provides an **interactive visual interface** to ingest data from Google Drive into Databricks (Unity Catalog Volumes or DBFS).
+# MAGIC 
+# MAGIC ## ✨ Features:
+# MAGIC - 🎨 **Visual File Browser** with checkboxes and interactive selection
+# MAGIC - 🔐 **Secure Authentication** via Databricks secrets
+# MAGIC - 💾 **Flexible Storage** - Save to Unity Catalog Volumes or DBFS
+# MAGIC - 📊 **Multiple File Types** - Supports Google Workspace files and regular files
+# MAGIC - 📈 **Progress Tracking** - Real-time download and ingestion status
 # MAGIC 
 # MAGIC ## Setup Requirements:
 # MAGIC 1. Create a Databricks secret scope with Google Drive credentials
-# MAGIC 2. Store your Google Drive service account JSON or OAuth credentials in the secret scope
-# MAGIC 3. Install required libraries: `%pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client`
+# MAGIC 2. Store your Google Drive service account JSON credentials in the secret scope
+# MAGIC 3. (For Volumes) Create a Unity Catalog volume: `/Volumes/catalog/schema/volume`
 # MAGIC 
-# MAGIC ## Widgets:
+# MAGIC ## Widget Parameters:
 # MAGIC - **secret_scope**: Name of the Databricks secret scope containing Google Drive credentials
 # MAGIC - **credentials_key**: Key name for the Google Drive credentials in the secret scope
 # MAGIC - **folder_id**: (Optional) Google Drive folder ID to list files from (leave empty for root)
-# MAGIC - **file_selection**: Comma-separated list of file IDs to ingest (populated after listing)
-# MAGIC - **output_path**: DBFS path where ingested files will be stored
+# MAGIC - **file_selection**: Comma-separated list of file IDs to ingest (use the visual interface to select)
+# MAGIC - **storage_type**: Choose "volume" for Unity Catalog Volumes or "dbfs" for DBFS
+# MAGIC - **output_path**: Destination path (e.g., `/Volumes/catalog/schema/volume/folder` or `/mnt/path`)
+# MAGIC - **action**: Select "list_files" to browse or "ingest_files" to download
 
 # COMMAND ----------
 
@@ -55,8 +64,9 @@ dbutils.widgets.text("secret_scope", "", "1. Secret Scope Name")
 dbutils.widgets.text("credentials_key", "google_drive_credentials", "2. Credentials Key")
 dbutils.widgets.text("folder_id", "", "3. Google Drive Folder ID (optional)")
 dbutils.widgets.text("file_selection", "", "4. File IDs to Ingest (comma-separated)")
-dbutils.widgets.text("output_path", "/mnt/ingest/google_drive", "5. Output DBFS Path")
-dbutils.widgets.dropdown("action", "list_files", ["list_files", "ingest_files"], "6. Action")
+dbutils.widgets.dropdown("storage_type", "volume", ["volume", "dbfs"], "5. Storage Type")
+dbutils.widgets.text("output_path", "/Volumes/catalog/schema/volume/google_drive", "6. Output Path (Volume or DBFS)")
+dbutils.widgets.dropdown("action", "list_files", ["list_files", "ingest_files"], "7. Action")
 
 # COMMAND ----------
 
@@ -70,6 +80,7 @@ secret_scope = dbutils.widgets.get("secret_scope")
 credentials_key = dbutils.widgets.get("credentials_key")
 folder_id = dbutils.widgets.get("folder_id") or None
 file_selection = dbutils.widgets.get("file_selection")
+storage_type = dbutils.widgets.get("storage_type")
 output_path = dbutils.widgets.get("output_path")
 action = dbutils.widgets.get("action")
 
@@ -81,6 +92,7 @@ print(f"Configuration:")
 print(f"  Secret Scope: {secret_scope}")
 print(f"  Credentials Key: {credentials_key}")
 print(f"  Folder ID: {folder_id if folder_id else 'Root'}")
+print(f"  Storage Type: {storage_type}")
 print(f"  Output Path: {output_path}")
 print(f"  Action: {action}")
 
@@ -208,21 +220,207 @@ if action == "list_files":
         # Display summary
         print(f"Found {len(files_df)} items\n")
         
-        # Create a display DataFrame with relevant columns
+        # Create visual HTML table with checkboxes
+        html = """
+        <style>
+            .file-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin: 20px 0;
+            }
+            .file-table thead {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+            .file-table th {
+                padding: 15px;
+                text-align: left;
+                font-weight: 600;
+                border-bottom: 3px solid #555;
+            }
+            .file-table td {
+                padding: 12px 15px;
+                border-bottom: 1px solid #ddd;
+            }
+            .file-table tbody tr:hover {
+                background-color: #f5f5f5;
+                transition: background-color 0.3s;
+            }
+            .file-table tbody tr:nth-child(even) {
+                background-color: #fafafa;
+            }
+            .file-id {
+                font-family: monospace;
+                font-size: 11px;
+                color: #666;
+                background: #f0f0f0;
+                padding: 2px 6px;
+                border-radius: 3px;
+            }
+            .checkbox-cell {
+                text-align: center;
+                width: 40px;
+            }
+            .checkbox-cell input[type="checkbox"] {
+                width: 18px;
+                height: 18px;
+                cursor: pointer;
+            }
+            .type-icon {
+                font-size: 20px;
+            }
+            .select-all-row {
+                background: #f8f9fa !important;
+                font-weight: bold;
+            }
+            .instructions {
+                background: #e3f2fd;
+                border-left: 4px solid #2196F3;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }
+            .instructions h3 {
+                margin-top: 0;
+                color: #1976D2;
+            }
+            .btn-copy {
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                margin-top: 10px;
+            }
+            .btn-copy:hover {
+                background: #45a049;
+            }
+            .selected-count {
+                font-weight: bold;
+                color: #2196F3;
+                font-size: 16px;
+                margin: 10px 0;
+            }
+        </style>
+        
+        <div class="instructions">
+            <h3>📋 File Selection Instructions</h3>
+            <ol>
+                <li>Review the files in the table below</li>
+                <li>Click the checkboxes to select files you want to ingest</li>
+                <li>Click "Copy Selected File IDs" button</li>
+                <li>Paste the IDs into the <strong>"File IDs to Ingest"</strong> widget above</li>
+                <li>Change the <strong>Action</strong> widget to <strong>"ingest_files"</strong></li>
+                <li>Run all cells to ingest the selected files</li>
+            </ol>
+        </div>
+        
+        <div id="selected-info" class="selected-count">Selected: <span id="count">0</span> files</div>
+        <button onclick="copySelected()" class="btn-copy">📋 Copy Selected File IDs</button>
+        
+        <table class="file-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-cell">
+                        <input type="checkbox" id="select-all" onchange="toggleAll(this)">
+                    </th>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Size (MB)</th>
+                    <th>Modified</th>
+                    <th>File ID</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+        
+        # Add rows for each file
+        for idx, row in files_df.iterrows():
+            file_type = row.get('type', '📄 File')
+            name = row.get('name', 'Unknown')
+            file_id = row.get('id', '')
+            size_mb = row.get('size_mb', 0)
+            modified = row.get('modifiedTime', 'N/A')
+            
+            # Format modified date to be more readable
+            if modified != 'N/A' and 'T' in str(modified):
+                modified = str(modified).split('T')[0]
+            
+            html += f"""
+                <tr>
+                    <td class="checkbox-cell">
+                        <input type="checkbox" class="file-checkbox" data-fileid="{file_id}" onchange="updateCount()">
+                    </td>
+                    <td class="type-icon">{file_type}</td>
+                    <td><strong>{name}</strong></td>
+                    <td>{size_mb}</td>
+                    <td>{modified}</td>
+                    <td><span class="file-id">{file_id}</span></td>
+                </tr>
+            """
+        
+        html += """
+            </tbody>
+        </table>
+        
+        <script>
+            function toggleAll(checkbox) {
+                const checkboxes = document.querySelectorAll('.file-checkbox');
+                checkboxes.forEach(cb => cb.checked = checkbox.checked);
+                updateCount();
+            }
+            
+            function updateCount() {
+                const checked = document.querySelectorAll('.file-checkbox:checked');
+                document.getElementById('count').textContent = checked.length;
+            }
+            
+            function copySelected() {
+                const checked = document.querySelectorAll('.file-checkbox:checked');
+                const fileIds = Array.from(checked).map(cb => cb.dataset.fileid);
+                
+                if (fileIds.length === 0) {
+                    alert('⚠️ Please select at least one file!');
+                    return;
+                }
+                
+                const idsString = fileIds.join(', ');
+                
+                // Copy to clipboard
+                navigator.clipboard.writeText(idsString).then(() => {
+                    alert(`✓ Copied ${fileIds.length} file ID(s) to clipboard!\\n\\nNow paste into the "File IDs to Ingest" widget.`);
+                }).catch(err => {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = idsString;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert(`✓ Copied ${fileIds.length} file ID(s) to clipboard!\\n\\nNow paste into the "File IDs to Ingest" widget.`);
+                });
+            }
+            
+            // Initialize count on load
+            updateCount();
+        </script>
+        """
+        
+        # Display the HTML table
+        displayHTML(html)
+        
+        # Also show a simple dataframe version for reference
+        print("\n" + "="*80)
+        print("Standard Table View:")
         display_cols = ['type', 'name', 'id', 'size_mb', 'modifiedTime']
         display_df = files_df[display_cols].copy()
         display_df.columns = ['Type', 'Name', 'File ID', 'Size (MB)', 'Modified']
-        
-        # Display the files
         display(display_df)
         
-        print("\n" + "="*80)
-        print("To ingest files:")
-        print("1. Copy the File IDs from the table above")
-        print("2. Paste them into the 'File IDs to Ingest' widget (comma-separated)")
-        print("3. Change the Action widget to 'ingest_files'")
-        print("4. Run the next cells")
-        print("="*80)
     else:
         print("No files found in the specified location.")
 
@@ -311,14 +509,26 @@ if action == "ingest_files":
         # Parse file IDs
         file_ids = [fid.strip() for fid in file_selection.split(',') if fid.strip()]
         print(f"Files to ingest: {len(file_ids)}")
+        print(f"Storage type: {storage_type}")
         
         # Create temporary local directory
         import tempfile
         local_temp_dir = tempfile.mkdtemp()
         print(f"Temporary directory: {local_temp_dir}\n")
         
-        # Create output directory in DBFS
-        dbutils.fs.mkdirs(output_path)
+        # Create output directory
+        if storage_type == "volume":
+            # For volumes, ensure the path exists
+            # Volumes use /Volumes/catalog/schema/volume format
+            print(f"Creating volume directory: {output_path}")
+            try:
+                dbutils.fs.mkdirs(output_path)
+            except Exception as e:
+                print(f"Note: {str(e)}")
+                print("If using a volume, ensure it exists in Unity Catalog first.")
+        else:
+            # For DBFS
+            dbutils.fs.mkdirs(output_path)
         
         ingested_files = []
         failed_files = []
@@ -336,15 +546,25 @@ if action == "ingest_files":
                 # Download file
                 local_file_path = download_file(drive_service, file_id, file_name, local_temp_dir)
                 
-                # Copy to DBFS
-                dbfs_path = f"{output_path}/{os.path.basename(local_file_path)}"
-                dbutils.fs.cp(f"file://{local_file_path}", dbfs_path)
-                print(f"  ✓ Copied to DBFS: {dbfs_path}")
+                # Copy to destination (Volume or DBFS)
+                dest_path = f"{output_path}/{os.path.basename(local_file_path)}"
+                
+                if storage_type == "volume":
+                    # For Unity Catalog volumes
+                    print(f"  Copying to Volume: {dest_path}")
+                    dbutils.fs.cp(f"file://{local_file_path}", dest_path)
+                    print(f"  ✓ Copied to Volume: {dest_path}")
+                else:
+                    # For DBFS
+                    print(f"  Copying to DBFS: {dest_path}")
+                    dbutils.fs.cp(f"file://{local_file_path}", dest_path)
+                    print(f"  ✓ Copied to DBFS: {dest_path}")
                 
                 ingested_files.append({
                     'file_id': file_id,
                     'file_name': file_name,
-                    'dbfs_path': dbfs_path,
+                    'destination_path': dest_path,
+                    'storage_type': storage_type,
                     'status': 'success'
                 })
                 
@@ -352,6 +572,7 @@ if action == "ingest_files":
                 print(f"  ✗ Failed to process file: {str(e)}")
                 failed_files.append({
                     'file_id': file_id,
+                    'file_name': file_metadata.get('name', 'Unknown') if 'file_metadata' in locals() else 'Unknown',
                     'error': str(e),
                     'status': 'failed'
                 })
@@ -360,30 +581,157 @@ if action == "ingest_files":
         import shutil
         shutil.rmtree(local_temp_dir)
         
-        # Display summary
+        # Display summary with visual styling
+        summary_html = f"""
+        <style>
+            .summary-container {{
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }}
+            .summary-title {{
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 15px;
+            }}
+            .summary-stats {{
+                display: flex;
+                gap: 30px;
+                margin-top: 15px;
+            }}
+            .stat-box {{
+                background: rgba(255,255,255,0.2);
+                padding: 15px 25px;
+                border-radius: 8px;
+                text-align: center;
+            }}
+            .stat-number {{
+                font-size: 36px;
+                font-weight: bold;
+                display: block;
+            }}
+            .stat-label {{
+                font-size: 14px;
+                margin-top: 5px;
+                opacity: 0.9;
+            }}
+            .success {{
+                color: #4CAF50;
+            }}
+            .failed {{
+                color: #f44336;
+            }}
+        </style>
+        
+        <div class="summary-container">
+            <div class="summary-title">🎉 Ingestion Complete</div>
+            <div class="summary-stats">
+                <div class="stat-box">
+                    <span class="stat-number">✓ {len(ingested_files)}</span>
+                    <span class="stat-label">Successfully Ingested</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number">✗ {len(failed_files)}</span>
+                    <span class="stat-label">Failed</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number">{len(file_ids)}</span>
+                    <span class="stat-label">Total Processed</span>
+                </div>
+            </div>
+        </div>
+        """
+        
+        displayHTML(summary_html)
+        
+        # Display detailed results
         print(f"\n{'='*80}")
-        print("INGESTION SUMMARY")
+        print("INGESTION DETAILS")
         print(f"{'='*80}")
-        print(f"✓ Successfully ingested: {len(ingested_files)}")
-        print(f"✗ Failed: {len(failed_files)}")
+        print(f"Storage Type: {storage_type.upper()}")
+        print(f"Destination: {output_path}")
         print(f"{'='*80}\n")
         
         if ingested_files:
-            print("Successfully ingested files:")
+            print("✓ Successfully ingested files:")
             ingested_df = pd.DataFrame(ingested_files)
             display(ingested_df)
         
         if failed_files:
-            print("\nFailed files:")
+            print("\n✗ Failed files:")
             failed_df = pd.DataFrame(failed_files)
             display(failed_df)
         
-        print(f"\nAll files are available at: {output_path}")
+        print(f"\n{'='*80}")
+        print(f"All files are available at: {output_path}")
+        print(f"{'='*80}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Load Ingested Data (Optional)
+# MAGIC ## Load Ingested Data from Volume/DBFS
+
+# COMMAND ----------
+
+# List all files in the destination
+try:
+    files_list = dbutils.fs.ls(output_path)
+    print(f"📁 Files in {output_path}:\n")
+    
+    html_files = """
+    <style>
+        .files-container {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .file-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .file-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .file-size {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+    <div class="files-container">
+        <h3>📂 Available Files</h3>
+    """
+    
+    for file_info in files_list:
+        file_name = file_info.name
+        file_size = file_info.size / (1024 * 1024)  # Convert to MB
+        html_files += f"""
+        <div class="file-item">
+            <span class="file-name">{file_name}</span>
+            <span class="file-size">{file_size:.2f} MB</span>
+        </div>
+        """
+    
+    html_files += "</div>"
+    displayHTML(html_files)
+    
+except Exception as e:
+    print(f"No files found or error accessing path: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Example: Load CSV Files
 
 # COMMAND ----------
 
@@ -394,9 +742,50 @@ if action == "ingest_files":
 # if csv_files:
 #     print(f"Found {len(csv_files)} CSV files")
 #     for csv_file in csv_files:
-#         print(f"  - {csv_file}")
+#         print(f"Loading: {csv_file}")
 #         df = spark.read.csv(csv_file, header=True, inferSchema=True)
 #         display(df.limit(10))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Example: Load from Unity Catalog Volume
+
+# COMMAND ----------
+
+# Example: Read a file from a Unity Catalog volume
+# Uncomment and modify as needed
+
+# # For CSV files in volumes
+# df = spark.read.csv(f"{output_path}/your_file.csv", header=True, inferSchema=True)
+# display(df)
+
+# # For Parquet files
+# df = spark.read.parquet(f"{output_path}/your_file.parquet")
+# display(df)
+
+# # For JSON files  
+# df = spark.read.json(f"{output_path}/your_file.json")
+# display(df)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Example: Create Delta Table from Ingested Data
+
+# COMMAND ----------
+
+# Example: Create a Delta table from CSV files in the volume
+# Uncomment and modify as needed
+
+# # Read CSV from volume
+# df = spark.read.csv(f"{output_path}/your_file.csv", header=True, inferSchema=True)
+
+# # Write to Delta table in Unity Catalog
+# df.write.format("delta").mode("overwrite").saveAsTable("catalog.schema.table_name")
+
+# # Or write to DBFS location
+# df.write.format("delta").mode("overwrite").save("/mnt/delta/table_name")
 
 # COMMAND ----------
 
