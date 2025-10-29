@@ -1,0 +1,10 @@
+# Google Drive API Dependencies
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
+google-api-python-client>=2.100.0
+pydrive2>=1.17.0
+
+# Data Processing
+pandas>=1.5.0
+
