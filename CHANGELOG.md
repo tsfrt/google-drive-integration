@@ -2,9 +2,46 @@
 
 All notable changes to the Google Drive to Databricks ingestion project.
 
+## [2.1.0] - 2024-10-29
+
+### 🎯 True Zero-Temp-File Implementation
+
+#### Changed
+- **Eliminated `/tmp` usage completely**: Files now write directly to DBFS/Volume using filesystem mount points
+- **Direct filesystem writes**: Uses `/dbfs/` prefix for DBFS paths and native `/Volumes/` paths for volumes
+- **Simplified logic**: Removed all temporary file creation, copying, and cleanup operations
+
+#### Technical Implementation
+```python
+# DBFS path conversion
+/mnt/path → /dbfs/mnt/path (direct write)
+
+# Volume path (native)
+/Volumes/catalog/schema/volume (direct write)
+
+# Zero temp files
+Google Drive API → BytesIO buffer → Direct write to destination
+Google Drive API → Direct stream to destination file
+```
+
+#### Performance Improvements
+- **100% elimination** of temporary file storage
+- **Zero cleanup** operations needed
+- **Simpler code** with standard Python file operations
+- **Lower latency** by removing intermediate steps
+
+#### Key Benefits
+- ✅ No `/tmp` directory usage at all
+- ✅ No file copy operations
+- ✅ No cleanup logic needed
+- ✅ Works seamlessly with both DBFS and Volumes
+- ✅ Memory-efficient for all file sizes
+
+---
+
 ## [2.0.0] - 2024-10-29
 
-### 🚀 Major Performance Optimization
+### 🚀 Major Performance Optimization (Initial Direct Write)
 
 #### Changed
 - **Direct Write Implementation**: Completely redesigned the download and ingestion logic to write files directly to DBFS/Volume instead of using intermediate temporary storage

@@ -165,23 +165,30 @@ CREATE VOLUME IF NOT EXISTS main.default.google_drive_ingest;
 
 ## Performance Features
 
-### ⚡ Direct Write Optimization
-The notebook uses an optimized approach that writes files directly to the destination:
+### ⚡ Zero-Temp-File Architecture
+The notebook uses a **true direct write** approach with **ZERO temporary files**:
 
 ```
-Traditional:  Google Drive → Temp Storage → DBFS/Volume
-Optimized:    Google Drive → DBFS/Volume (direct!)
+Traditional:  Google Drive → /tmp → Copy → DBFS/Volume → Cleanup
+Optimized:    Google Drive → DBFS/Volume (direct stream!)
 ```
+
+**How it works:**
+- **DBFS paths**: Automatically converts `/mnt/path` to `/dbfs/mnt/path` for direct write
+- **Volume paths**: Uses `/Volumes/catalog/schema/volume` natively
+- **No temp files**: Files never touch `/tmp` or any intermediate storage
 
 **Benefits:**
-- ✅ Faster ingestion (no intermediate copy)
-- ✅ Lower disk usage (no temp files)
-- ✅ Automatic cleanup
-- ✅ Better scalability
+- ✅ Faster ingestion (no intermediate steps)
+- ✅ Zero disk overhead (no temp files at all)
+- ✅ No cleanup needed (nothing to clean!)
+- ✅ Better scalability (simpler I/O)
+- ✅ Works seamlessly with volumes and DBFS
 
 ### Smart File Handling
-- **Small files (≤100MB)**: Downloaded to memory, written directly
-- **Large files (>100MB)**: Streamed with progress tracking
+- **Small files (≤100MB)**: Downloaded to memory buffer → written directly to destination
+- **Large files (>100MB)**: Streamed directly to destination with progress tracking
+- **All sizes**: Zero temporary files created
 
 ## Tips & Tricks
 

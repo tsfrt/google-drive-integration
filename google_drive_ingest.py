@@ -10,7 +10,7 @@
 # MAGIC - 💾 **Flexible Storage** - Save to Unity Catalog Volumes or DBFS
 # MAGIC - 📊 **Multiple File Types** - Supports Google Workspace files and regular files
 # MAGIC - 📈 **Progress Tracking** - Real-time download and ingestion status
-# MAGIC - ⚡ **Optimized Performance** - Direct writes to destination (no temp files), smart file size handling
+# MAGIC - ⚡ **Zero-Temp-File Architecture** - True direct writes to DBFS/Volumes (zero `/tmp` usage), automatic path conversion
 # MAGIC 
 # MAGIC ## Setup Requirements:
 # MAGIC 1. Create a Databricks secret scope with Google Drive credentials
@@ -436,15 +436,16 @@ def download_file_to_destination(service, file_id, file_name, dest_path, max_siz
     """
     Download a file from Google Drive directly to DBFS/Volume.
     
-    Uses dbutils.fs.put for files under max_size_for_put MB,
-    otherwise writes in chunks for better memory management.
+    Writes directly to the destination using filesystem paths:
+    - For DBFS: Converts /mnt/path to /dbfs/mnt/path
+    - For Volumes: Uses /Volumes/catalog/schema/volume directly
     
     Args:
         service: Google Drive service object
         file_id: ID of the file to download
         file_name: Name of the file
-        dest_path: Destination path in DBFS/Volume
-        max_size_for_put: Maximum file size in MB to use dbutils.fs.put (default: 100MB)
+        dest_path: Destination path in DBFS/Volume (e.g., /mnt/data or /Volumes/catalog/schema/vol)
+        max_size_for_put: Maximum file size in MB for in-memory buffering (default: 100MB)
     
     Returns:
         Final destination path
@@ -477,9 +478,25 @@ def download_file_to_destination(service, file_id, file_name, dest_path, max_siz
         
         final_dest_path = f"{dest_path}/{final_file_name}"
         
-        # Method 1: For small files, download to memory and use dbutils.fs.put
+        # Convert DBFS path to filesystem path
+        # DBFS paths like /mnt/path need to be prefixed with /dbfs
+        # Volume paths like /Volumes/catalog/schema/volume are already accessible
+        if final_dest_path.startswith('/Volumes/'):
+            # Volume path - use directly
+            fs_path = final_dest_path
+        elif final_dest_path.startswith('/dbfs/'):
+            # Already has /dbfs prefix
+            fs_path = final_dest_path
+        else:
+            # DBFS path without prefix - add it
+            fs_path = f"/dbfs{final_dest_path}"
+        
+        print(f"  Writing directly to: {final_dest_path}")
+        print(f"  File size: {file_size_mb:.2f} MB")
+        
+        # Method 1: For small files, download to memory buffer then write
         if file_size_mb <= max_size_for_put:
-            print(f"  Using direct write (file size: {file_size_mb:.2f} MB)")
+            print(f"  Using in-memory buffer (file size ≤ {max_size_for_put} MB)")
             
             # Download to BytesIO buffer
             file_buffer = io.BytesIO()
@@ -491,53 +508,28 @@ def download_file_to_destination(service, file_id, file_name, dest_path, max_siz
                 if status:
                     print(f"    Progress: {int(status.progress() * 100)}%")
             
-            # Get the content as bytes
-            file_content = file_buffer.getvalue()
+            # Write directly to destination filesystem path
+            print(f"    Writing to destination...")
+            with open(fs_path, 'wb') as dest_file:
+                dest_file.write(file_buffer.getvalue())
+            
             file_buffer.close()
-            
-            # Write directly to DBFS/Volume using dbutils.fs.put
-            # Convert bytes to base64 for dbutils.fs.put
-            import base64
-            content_str = base64.b64encode(file_content).decode('utf-8')
-            
-            # For binary files, we need to use a temporary file approach for dbutils.fs.put
-            # Actually, let's use a better approach: write via Python file API for DBFS
-            temp_local = f"/tmp/{final_file_name}"
-            with open(temp_local, 'wb') as f:
-                f.write(file_content)
-            
-            dbutils.fs.cp(f"file://{temp_local}", final_dest_path)
-            
-            # Clean up temp file
-            import os as os_module
-            os_module.remove(temp_local)
-            
             print(f"  ✓ Written directly to: {final_dest_path}")
             
         else:
-            # Method 2: For larger files, use chunked download with temporary file
-            print(f"  Using chunked write (file size: {file_size_mb:.2f} MB)")
+            # Method 2: For larger files, stream directly to destination
+            print(f"  Using direct streaming (file size > {max_size_for_put} MB)")
             
-            temp_local = f"/tmp/{final_file_name}"
-            
-            # Download in chunks to temp file
-            with open(temp_local, 'wb') as fh:
-                downloader = MediaIoBaseDownload(fh, request)
+            # Stream directly to destination file
+            with open(fs_path, 'wb') as dest_file:
+                downloader = MediaIoBaseDownload(dest_file, request)
                 done = False
                 while not done:
                     status, done = downloader.next_chunk()
                     if status:
-                        print(f"    Download progress: {int(status.progress() * 100)}%")
+                        print(f"    Progress: {int(status.progress() * 100)}%")
             
-            # Copy to destination
-            print(f"    Copying to destination...")
-            dbutils.fs.cp(f"file://{temp_local}", final_dest_path)
-            
-            # Clean up temp file
-            import os as os_module
-            os_module.remove(temp_local)
-            
-            print(f"  ✓ Written to: {final_dest_path}")
+            print(f"  ✓ Streamed directly to: {final_dest_path}")
         
         return final_dest_path
         

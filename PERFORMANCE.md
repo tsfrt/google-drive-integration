@@ -58,50 +58,44 @@ done = False
 while not done:
     status, done = downloader.next_chunk()
 
-# Get bytes and write to temp location
-file_content = file_buffer.getvalue()
-temp_local = f"/tmp/{file_name}"
-with open(temp_local, 'wb') as f:
-    f.write(file_content)
+# Write directly to destination (no temp files!)
+# For DBFS: /mnt/path → /dbfs/mnt/path
+# For Volumes: /Volumes/catalog/schema/volume (direct)
+with open(fs_path, 'wb') as dest_file:
+    dest_file.write(file_buffer.getvalue())
 
-# Copy to final destination
-dbutils.fs.cp(f"file://{temp_local}", final_dest_path)
-
-# Immediate cleanup
-os.remove(temp_local)
+file_buffer.close()
 ```
 
 **Why this works:**
 - ✅ Files fit in memory
 - ✅ Fast buffer operations
-- ✅ Single write to destination
-- ✅ Minimal temp file lifetime
+- ✅ Single write directly to destination
+- ✅ Zero temporary files
+- ✅ No cleanup needed
 
 ### Method 2: Large Files (>100MB)
 
-For files over 100MB, we use streaming with minimal temp storage:
+For files over 100MB, we stream directly to the destination:
 
 ```python
-# Stream to minimal temp file
-temp_local = f"/tmp/{file_name}"
-with open(temp_local, 'wb') as fh:
-    downloader = MediaIoBaseDownload(fh, request)
+# Stream directly to destination (no temp files!)
+# Convert path: /mnt/path → /dbfs/mnt/path
+# Or use Volume path directly: /Volumes/catalog/schema/volume
+with open(fs_path, 'wb') as dest_file:
+    downloader = MediaIoBaseDownload(dest_file, request)
     done = False
     while not done:
         status, done = downloader.next_chunk()
-
-# Copy to destination
-dbutils.fs.cp(f"file://{temp_local}", final_dest_path)
-
-# Immediate cleanup
-os.remove(temp_local)
+        # File chunks written directly to destination
 ```
 
 **Why this works:**
 - ✅ Chunked downloads prevent memory overflow
 - ✅ Progress tracking for large files
-- ✅ Single file at a time (no accumulation)
-- ✅ Immediate cleanup after copy
+- ✅ Writes directly to final destination
+- ✅ Zero temporary storage
+- ✅ No cleanup needed
 
 ## Performance Comparison
 
@@ -117,11 +111,11 @@ os.remove(temp_local)
 
 ### Disk Usage (Example: Ingesting 10 files, 50MB each)
 
-| Approach | Peak Disk Usage | Post-Ingestion |
-|----------|----------------|----------------|
-| Traditional | 500MB (all temp) | 0MB (after cleanup) |
-| Optimized | 50MB (one at time) | 0MB (immediate cleanup) |
-| **Reduction** | **90% lower** | **Same** |
+| Approach | Peak Disk Usage | Temp Files Created |
+|----------|----------------|-------------------|
+| Traditional | 500MB (all temp) | 10 files |
+| Optimized v2.0 | 0MB (no temp) | 0 files |
+| **Reduction** | **100% eliminated** | **Zero temp files** |
 
 ## Memory Management
 
@@ -315,24 +309,32 @@ batch_size = 10  # Smaller batches
 # Use a larger driver node (more memory)
 ```
 
-### Issue 3: Temp File Accumulation
+### Issue 3: File Write Errors
 
 **Symptoms:**
-- `/tmp` directory fills up
-- Disk space errors
+- Permission denied errors
+- Path not found errors
 
 **Solutions:**
 ```python
-# Manual cleanup between batches
-import os
-import glob
+# For DBFS paths, ensure the path exists
+dbutils.fs.mkdirs("/mnt/your/path")
 
-temp_files = glob.glob('/tmp/*')
-for f in temp_files:
-    try:
-        os.remove(f)
-    except:
-        pass
+# For Volumes, ensure the volume exists in Unity Catalog
+CREATE VOLUME IF NOT EXISTS catalog.schema.volume_name;
+
+# Check file system path conversion
+print(f"DBFS path: {final_dest_path}")
+print(f"Filesystem path: {fs_path}")
+
+# Verify write access
+test_path = f"{output_path}/test.txt"
+try:
+    dbutils.fs.put(test_path, "test", True)
+    dbutils.fs.rm(test_path)
+    print("✓ Write access confirmed")
+except Exception as e:
+    print(f"✗ Write access denied: {e}")
 ```
 
 ## Future Optimizations

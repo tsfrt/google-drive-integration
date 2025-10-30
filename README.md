@@ -12,7 +12,7 @@ This project provides a Databricks notebook interface for ingesting data from Go
 - 📈 **Progress Tracking**: Real-time download and ingestion progress with visual summaries
 - 🎯 **Widget Interface**: Easy-to-use parameter widgets for configuration
 - 🌈 **Beautiful UI**: Gradient styling, hover effects, and modern design
-- ⚡ **Optimized Performance**: Direct writes to destination (no temporary files), smart handling for different file sizes
+- ⚡ **Zero-Temp-File Architecture**: True direct writes to DBFS/Volumes with zero `/tmp` usage, automatic path conversion for seamless operation
 
 ## Setup Instructions
 
@@ -335,19 +335,26 @@ The notebook uses an optimized ingestion approach:
 Instead of the traditional two-step process:
 ```
 ❌ Old: Google Drive → Local Temp → DBFS/Volume
-✅ New: Google Drive → DBFS/Volume (direct)
+✅ New: Google Drive → DBFS/Volume (direct stream!)
 ```
 
+### Zero-Temp-File Architecture
+The notebook writes directly to DBFS/Volumes using filesystem mount points:
+- **DBFS paths**: `/mnt/path` → `/dbfs/mnt/path` (direct write)
+- **Volume paths**: `/Volumes/catalog/schema/volume` (direct write)
+- **No `/tmp` usage**: Files never touch temporary storage
+
 ### Smart File Handling
-- **Small files (≤100MB)**: Downloaded to memory buffer, written directly
-- **Large files (>100MB)**: Streamed with chunked downloads for memory efficiency
-- **No temporary directory**: Eliminates intermediate storage and I/O overhead
+- **Small files (≤100MB)**: Downloaded to memory buffer, written directly to destination
+- **Large files (>100MB)**: Streamed directly to destination with chunked downloads
+- **Zero temporary files**: All writes go directly to final destination
 
 ### Benefits
-- ⚡ **Faster ingestion**: Eliminates redundant copy operations
-- 💾 **Lower disk usage**: No temporary file accumulation
+- ⚡ **Faster ingestion**: Eliminates ALL intermediate storage
+- 💾 **Zero disk overhead**: No temporary files created
 - 🚀 **Better scalability**: More efficient for large file sets
-- 🔄 **Cleaner process**: Automatic cleanup, no leftover temp files
+- 🔄 **Cleaner process**: No cleanup needed, no leftover files
+- 🎯 **Simpler logic**: Direct writes with standard Python file operations
 
 ## Contributing
 
