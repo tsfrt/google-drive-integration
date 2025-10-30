@@ -1,6 +1,6 @@
 # Quick Start Guide 🚀
 
-Get started with Google Drive to Databricks ingestion in 5 minutes!
+Download files from Google Drive to Databricks in 5 minutes - **No coding required!**
 
 ## Prerequisites
 
@@ -62,38 +62,40 @@ CREATE VOLUME IF NOT EXISTS main.default.google_drive_ingest;
 2. Attach to a running cluster
 3. Run all cells to install dependencies
 
-## First Ingestion (Interactive)
+## Using the Notebook (Super Simple!)
 
-### Step 1: Configure
-Set widget values:
+### Step 1: Configure (One Time)
+Fill in the 4 widget values at the top:
 - **Secret Scope**: `google_drive_secrets`
 - **Credentials Key**: `google_drive_credentials`
-- **Storage Type**: `volume`
-- **Output Path**: `/Volumes/main/default/google_drive_ingest`
-- **Action**: `list_files`
+- **Folder ID**: Leave empty (or paste a folder ID)
+- **Output Path**: `/Volumes/main/default/google_drive`
 
-### Step 2: Browse & Select
-1. Run the notebook
-2. See the visual file browser
-3. Check boxes next to files you want
-4. Click "Copy Selected File IDs"
+### Step 2: Browse Files
+1. Click **"Run All"** in Databricks
+2. Wait a few seconds
+3. See your Google Drive files in a beautiful table!
 
-### Step 3: Ingest
-1. Paste file IDs into widget
-2. Change Action to `ingest_files`
-3. Run notebook
-4. Watch the magic happen! ✨
+### Step 3: Select & Download
+1. **Check the boxes** next to files you want
+2. Click **"Copy Selected File IDs"**
+3. **Scroll down** to the "Download Files" cell
+4. **Paste** the IDs where it says `FILE_IDS_TO_DOWNLOAD = ""`
+5. **Run that cell** - files download automatically! ✨
 
 ### Step 4: Use Your Data
 ```python
-# Read ingested CSV
-df = spark.read.csv("/Volumes/main/default/google_drive_ingest/data.csv", 
+# Files are saved to your output path
+# Read a CSV file
+df = spark.read.csv("/Volumes/main/default/google_drive/data.csv", 
                     header=True, inferSchema=True)
 display(df)
 
-# Create Delta table
+# Create a Delta table
 df.write.format("delta").mode("overwrite").saveAsTable("main.default.my_table")
 ```
+
+**That's it!** No complex workflows, no confusing options. Just browse, select, download.
 
 ## Visual Guide
 

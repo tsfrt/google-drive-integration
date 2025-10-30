@@ -1,20 +1,21 @@
-# Google Drive to Databricks Ingestion 📁 ➡️ 💾
+# Google Drive File Browser & Download 📁⬇️
 
-This project provides a Databricks notebook interface for ingesting data from Google Drive into **Unity Catalog Volumes** or **DBFS** with a beautiful **visual file browser** and interactive selection interface.
+**Simple, beautiful interface for downloading files from Google Drive to Databricks.**
+
+Perfect for non-technical users who need to browse and download files from Google Drive into Unity Catalog Volumes or DBFS.
 
 ## ✨ Features
 
-- 🎨 **Visual File Browser**: Interactive HTML table with checkboxes for easy file selection
-- ⚡ **Quick Download**: Copy file IDs and paste into Quick Download Helper cell for immediate ingestion
-- 🔐 **Secure Authentication**: Uses Databricks secrets for Google Drive credentials
-- 💾 **Flexible Storage**: Save to Unity Catalog Volumes or DBFS
-- ✅ **Interactive Selection**: Click checkboxes and copy file IDs with one button
+- 🎨 **Beautiful File Browser**: Interactive table with checkboxes and gradient styling
+- 👥 **Non-Technical Friendly**: Anyone can use it - no coding required
+- ⚡ **Simple Workflow**: Browse → Select → Copy → Paste → Download
+- 🔐 **Secure**: Uses Databricks secrets for Google Drive credentials
+- 💾 **Flexible Storage**: Save to Unity Catalog Volumes or DBFS (auto-detected)
 - 📊 **Multiple File Types**: Supports Google Workspace files (Docs, Sheets, Slides) and regular files
-- 📈 **Progress Tracking**: Real-time download and ingestion progress with visual summaries
-- 🎯 **Widget Interface**: Easy-to-use parameter widgets for configuration
-- 🌈 **Beautiful UI**: Gradient styling, hover effects, and modern design
-- ⚡ **Zero-Temp-File Architecture**: True direct writes to DBFS/Volumes with zero `/tmp` usage, automatic path conversion
-- 🔧 **Modular Design**: Core functions extracted into `google_drive_utils.py` module for reusability
+- 📈 **Progress Tracking**: Real-time download progress with visual summaries
+- 🌈 **Modern UI**: Gradient styling, hover effects, clean design
+- ⚡ **Zero-Temp-File Architecture**: Direct writes to destination (no `/tmp` usage)
+- 🔧 **Modular Design**: All Python functions in `google_drive_utils.py` module for developers
 
 ## Setup Instructions
 
@@ -88,82 +89,81 @@ This project provides a Databricks notebook interface for ingesting data from Go
 
 ## Usage
 
-### Step 1: Configure Widgets
+### Step 1: Configure Settings (One Time Setup)
 
-Once the notebook is imported and attached to a cluster, run the first few cells to create the widgets. Configure the following:
+1. **Import the notebook** into your Databricks workspace
+2. **Attach to a cluster** (any size works)
+3. **Configure the 4 simple widgets**:
+   - **Secret Scope**: Your Databricks secret scope name (e.g., `google_drive_secrets`)
+   - **Credentials Key**: Key for your Google Drive credentials (e.g., `google_drive_credentials`)
+   - **Folder ID** (Optional): Leave empty for root, or paste a specific folder ID
+   - **Output Path**: Where to save files (e.g., `/Volumes/main/default/google_drive`)
 
-1. **Secret Scope Name**: Enter your secret scope name (e.g., `google_drive_secrets`)
-2. **Credentials Key**: Enter the key name for your credentials (e.g., `google_drive_credentials`)
-3. **Google Drive Folder ID** (Optional): 
-   - Leave empty to list files from root
-   - To get a folder ID:
-     - Open the folder in Google Drive
-     - Copy the ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`
-4. **File IDs to Ingest**: Leave empty for now (will be populated via visual interface)
-5. **Storage Type**: Choose `volume` for Unity Catalog Volumes or `dbfs` for DBFS
-6. **Output Path**: 
-   - For Volumes: `/Volumes/catalog/schema/volume/google_drive`
-   - For DBFS: `/mnt/ingest/google_drive`
-7. **Action**: Select `list_files`
+### Step 2: Browse Your Files
 
-### Step 2: Browse Files with Visual Interface
+1. **Run all cells** (⌘/Ctrl + Shift + Enter in Databricks)
+2. **See your files** in the beautiful interactive browser
+3. **Select files** using the checkboxes
+   - Check individual files or use "Select All"
+   - See the count update in real-time
 
-1. Set the "Action" widget to `list_files`
-2. Run the notebook cells
-3. You'll see a beautiful interactive table with:
-   - ✅ **Checkboxes** for each file
-   - 📁 **File type icons** (folders, documents, spreadsheets, etc.)
-   - 📝 **File names** and metadata
-   - 📊 **File sizes** in MB
-   - 📅 **Last modified dates**
-   - 🆔 **File IDs** (for reference)
+### Step 3: Download Files
 
-### Step 3: Select Files Interactively
+1. **Click "Copy Selected File IDs"** button
+2. **Scroll down** to the "Download Files" cell
+3. **Paste the IDs** into the `FILE_IDS_TO_DOWNLOAD` variable
+4. **Run the cell** - that's it!
 
-1. **Click checkboxes** next to the files you want to ingest
-   - Use the checkbox in the header to select/deselect all files
-   - The selected count updates automatically
-2. **Click the "Copy Selected File IDs" button**
-   - File IDs are automatically copied to your clipboard
-   - You'll see a confirmation message
-3. **Paste** the copied IDs into the "File IDs to Ingest" widget
+### Visual Workflow
 
-### Step 4: Ingest Files
+```
+┌─────────────────────────────┐
+│  ⚙️ Configure Settings      │
+│  - Secret Scope             │
+│  - Output Path              │
+└──────────┬──────────────────┘
+           │
+           ▼ Run All Cells
+┌─────────────────────────────┐
+│  📂 Beautiful File Browser  │
+│  ☑ sales_report.csv         │
+│  ☑ data.xlsx                │
+│  ☐ meeting_notes.pdf        │
+│                             │
+│  [Copy Selected File IDs]   │
+└──────────┬──────────────────┘
+           │
+           ▼ Paste IDs
+┌─────────────────────────────┐
+│  ⬇️ Download Files Cell     │
+│  FILE_IDS = "id1, id2"      │
+└──────────┬──────────────────┘
+           │
+           ▼ Run Cell
+┌─────────────────────────────┐
+│  ✅ Download Complete!      │
+│  ✓ sales_report.csv         │
+│  ✓ data.xlsx                │
+│                             │
+│  💾 Saved to: /Volumes/...  │
+└─────────────────────────────┘
+```
 
-1. Change the "Action" widget to `ingest_files`
-2. Run the notebook cells
-3. Monitor the progress:
-   - Real-time download progress for each file
-   - Visual summary card showing success/failure counts
-   - Detailed table of all ingested files
-4. Files are automatically saved to your chosen destination (Volume or DBFS)
+### Step 4: Use Your Downloaded Files
 
-### Step 5: Access Ingested Data
+The last cell in the notebook shows all downloaded files. You can then:
 
-After ingestion, your files will be available in the specified location. The notebook automatically displays a visual list of all ingested files.
-
-#### From Unity Catalog Volume:
 ```python
-# List files in volume
-dbutils.fs.ls("/Volumes/catalog/schema/volume/google_drive")
-
-# Read CSV from volume
-df = spark.read.csv("/Volumes/catalog/schema/volume/google_drive/your_file.csv", 
+# Read a CSV file
+df = spark.read.csv("/Volumes/main/default/google_drive/sales_report.csv", 
                     header=True, inferSchema=True)
 display(df)
 
-# Create Delta table from volume
-df.write.format("delta").mode("overwrite").saveAsTable("catalog.schema.table_name")
-```
+# Create a Delta table
+df.write.format("delta").mode("overwrite").saveAsTable("main.default.sales_report")
 
-#### From DBFS:
-```python
-# List files in DBFS
-dbutils.fs.ls("/mnt/ingest/google_drive")
-
-# Read CSV from DBFS
-df = spark.read.csv("/mnt/ingest/google_drive/your_file.csv", header=True, inferSchema=True)
-display(df)
+# Or access from DBFS
+df = spark.read.csv("dbfs:/mnt/data/report.csv", header=True, inferSchema=True)
 ```
 
 ## File Type Support

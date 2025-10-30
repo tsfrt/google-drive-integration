@@ -4,12 +4,24 @@ Google Drive Utilities for Databricks Integration
 This module provides utility functions for authenticating with Google Drive,
 listing files, and downloading files directly to DBFS/Unity Catalog Volumes.
 
+All core functions are extracted here for reusability across notebooks and scripts.
+
 Usage:
     from google_drive_utils import (
         get_google_drive_service,
         list_drive_contents,
         download_file_to_destination
     )
+    
+    # Authenticate
+    service = get_google_drive_service(dbutils, "scope", "key")
+    
+    # List files
+    files_df = list_drive_contents(service)
+    
+    # Download files
+    for idx, row in files_df.iterrows():
+        download_file_to_destination(service, row['id'], row['name'], "/Volumes/path")
 """
 
 import json
@@ -17,6 +29,11 @@ import io
 import os
 from typing import Optional, Tuple
 import pandas as pd
+
+# Google API imports
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 
 def get_google_drive_service(dbutils, secret_scope: str, credentials_key: str):
@@ -35,9 +52,6 @@ def get_google_drive_service(dbutils, secret_scope: str, credentials_key: str):
         Exception: If authentication fails
     """
     try:
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        
         # Get credentials from Databricks secrets
         credentials_json = dbutils.secrets.get(scope=secret_scope, key=credentials_key)
         credentials_dict = json.loads(credentials_json)
@@ -184,8 +198,6 @@ def download_file_to_destination(
         Exception: If download fails
     """
     try:
-        from googleapiclient.http import MediaIoBaseDownload
-        
         # Get file metadata
         file_metadata = service.files().get(fileId=file_id, fields='mimeType,name,size').execute()
         mime_type = file_metadata.get('mimeType')

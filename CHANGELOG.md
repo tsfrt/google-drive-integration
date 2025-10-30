@@ -2,6 +2,52 @@
 
 All notable changes to the Google Drive to Databricks ingestion project.
 
+## [3.0.0] - 2024-10-29
+
+### 🎨 Complete Notebook Simplification - User-Friendly Redesign
+
+#### Major Changes
+- **Simplified Notebook**: Complete rewrite focused on non-technical users
+- **Removed Complex Widgets**: Eliminated action dropdowns and complex configuration
+- **Single Workflow**: Browse files → Select → Download (that's it!)
+- **All Functions Extracted**: 100% of Python functions now in `google_drive_utils.py` module
+- **Cleaner UI**: Removed technical cells, extra options, and confusing elements
+
+#### New User Experience
+```
+1. Configure settings (4 simple widgets)
+2. See beautiful file browser
+3. Click checkboxes to select files
+4. Copy file IDs
+5. Paste and run download cell
+```
+
+#### What Was Removed
+- ❌ Action dropdown widgets (list_files vs ingest_files)
+- ❌ Storage type dropdown (automatically detected)
+- ❌ Quick Download Helper cell (consolidated)
+- ❌ Complex ingestion workflow
+- ❌ All inline function definitions
+- ❌ Technical markdown cells
+- ❌ Extra configuration options
+
+#### What Was Added
+- ✅ Single, clear download cell
+- ✅ Beautiful gradient-styled file browser
+- ✅ Simple step-by-step instructions
+- ✅ Visual feedback at every step
+- ✅ Downloaded files viewer
+- ✅ Tips section for non-technical users
+
+#### Benefits
+- 🎯 **80% fewer cells**: From complex workflow to simple interface
+- 👥 **Non-technical friendly**: Anyone can use it
+- 🧹 **Cleaner code**: All logic in reusable module
+- ⚡ **Faster**: Less clicking, less confusion
+- 📱 **Modern UI**: Gradient styling, better UX
+
+---
+
 ## [2.2.0] - 2024-10-29
 
 ### 🔧 Modular Architecture & Quick Download
