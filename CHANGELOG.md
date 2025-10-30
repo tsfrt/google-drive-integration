@@ -2,6 +2,44 @@
 
 All notable changes to the Google Drive to Databricks ingestion project.
 
+## [3.1.0] - 2024-10-29
+
+### 📤 Export Delta Tables to Google Drive
+
+#### Added
+- **Export Functionality**: New ability to upload Delta tables from Databricks to Google Drive
+- **Two Export Formats**: Support for CSV and Parquet exports
+- **Row Limiting**: Optional parameter to export only a subset of rows
+- **New Functions in Module**:
+  - `upload_file_to_google_drive()` - Upload any file to Google Drive
+  - `export_table_to_google_drive()` - Export Delta table and upload in one step
+- **New Notebook Cell**: Simple interface for exporting tables
+
+#### How It Works
+```python
+# Export a Delta table to Google Drive
+TABLE_NAME = "main.default.sales_data"
+OUTPUT_FILE_NAME = "sales_report"
+EXPORT_FORMAT = "csv"  # or "parquet"
+MAX_ROWS = 10000  # Optional limit
+```
+
+#### Features
+- ✅ Exports Delta tables as CSV or Parquet
+- ✅ Handles large tables with row limiting
+- ✅ Provides Google Drive link after upload
+- ✅ Automatic cleanup of temporary files
+- ✅ Clear error messages and progress tracking
+- ✅ Uses same authentication as downloads
+
+#### Use Cases
+- Share processed data with non-Databricks users
+- Create reports and distribute via Google Drive
+- Backup Delta tables to Google Drive
+- Export subsets of data for external analysis
+
+---
+
 ## [3.0.0] - 2024-10-29
 
 ### 🎨 Complete Notebook Simplification - User-Friendly Redesign

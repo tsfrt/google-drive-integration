@@ -451,18 +451,112 @@ except Exception as e:
 # MAGIC %md
 # MAGIC ---
 # MAGIC 
+# MAGIC ## 📤 Export Delta Table to Google Drive
+# MAGIC 
+# MAGIC Upload a Delta table from Databricks back to Google Drive as CSV or Parquet.
+
+# COMMAND ----------
+
+# Import the export function
+from google_drive_utils import export_table_to_google_drive
+
+# Configure your export
+TABLE_NAME = ""  # Example: "main.default.sales_data"
+OUTPUT_FILE_NAME = ""  # Example: "sales_report"
+EXPORT_FORMAT = "csv"  # Options: "csv" or "parquet"
+UPLOAD_FOLDER_ID = FOLDER_ID  # Uses the same folder from settings above, or change to a different folder ID
+MAX_ROWS = None  # Set a number to limit rows (e.g., 10000), or leave as None for all rows
+
+# Example:
+# TABLE_NAME = "main.default.sales_data"
+# OUTPUT_FILE_NAME = "monthly_sales_report"
+# EXPORT_FORMAT = "csv"
+# MAX_ROWS = 10000  # Export only first 10,000 rows
+
+if TABLE_NAME.strip():
+    print("="*80)
+    print("📤 EXPORTING TABLE TO GOOGLE DRIVE")
+    print("="*80)
+    print()
+    
+    try:
+        # Export and upload
+        file_id = export_table_to_google_drive(
+            spark,
+            drive_service,
+            TABLE_NAME,
+            OUTPUT_FILE_NAME,
+            folder_id=UPLOAD_FOLDER_ID,
+            file_format=EXPORT_FORMAT,
+            max_rows=MAX_ROWS
+        )
+        
+        print()
+        print("="*80)
+        print("✅ EXPORT COMPLETE!")
+        print("="*80)
+        print(f"Table: {TABLE_NAME}")
+        print(f"Format: {EXPORT_FORMAT.upper()}")
+        print(f"File ID: {file_id}")
+        print(f"Folder: {'Root' if not UPLOAD_FOLDER_ID else UPLOAD_FOLDER_ID}")
+        print()
+        print("💡 You can now access this file in Google Drive!")
+        print("="*80)
+        
+    except Exception as e:
+        print()
+        print("="*80)
+        print("❌ EXPORT FAILED")
+        print("="*80)
+        print(f"Error: {e}")
+        print()
+        print("Common issues:")
+        print("  - Table name is incorrect (use: catalog.schema.table)")
+        print("  - Table doesn't exist or you don't have access")
+        print("  - Google Drive API permissions issue")
+        print("="*80)
+        
+else:
+    print("ℹ️ To export a Delta table to Google Drive:")
+    print()
+    print("   1. Enter the full table name (e.g., 'main.default.my_table')")
+    print("   2. Choose an output file name")
+    print("   3. Select format: 'csv' or 'parquet'")
+    print("   4. Optionally limit rows with MAX_ROWS")
+    print("   5. Run this cell")
+    print()
+    print("   Example:")
+    print('   TABLE_NAME = "main.default.sales_data"')
+    print('   OUTPUT_FILE_NAME = "sales_report"')
+    print('   EXPORT_FORMAT = "csv"')
+    print('   MAX_ROWS = 10000  # Optional')
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC 
 # MAGIC ## 💡 Tips
 # MAGIC 
 # MAGIC - **Change folders**: Update the "Folder ID" widget and re-run cells
 # MAGIC - **Download more files**: Just run the "Download Files" cell again with new IDs
-# MAGIC - **View files**: Use the last cell to see what's been downloaded
+# MAGIC - **Export tables**: Use the cell above to push Delta tables back to Google Drive
+# MAGIC - **View files**: Use the "View Downloaded Files" cell to see what's been downloaded
 # MAGIC 
 # MAGIC ## 🔧 Advanced
 # MAGIC 
 # MAGIC For programmatic access, import the utility module:
 # MAGIC ```python
-# MAGIC from google_drive_utils import download_file_to_destination
+# MAGIC from google_drive_utils import (
+# MAGIC     download_file_to_destination,
+# MAGIC     export_table_to_google_drive
+# MAGIC )
+# MAGIC 
+# MAGIC # Download from Google Drive
 # MAGIC download_file_to_destination(drive_service, file_id, file_name, OUTPUT_PATH)
+# MAGIC 
+# MAGIC # Upload to Google Drive
+# MAGIC export_table_to_google_drive(spark, drive_service, "catalog.schema.table", "output.csv")
 # MAGIC ```
 # MAGIC 
 # MAGIC See `MODULE_README.md` and `USAGE_EXAMPLES.md` for more details.

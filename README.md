@@ -6,13 +6,22 @@ Perfect for non-technical users who need to browse and download files from Googl
 
 ## ✨ Features
 
+### Download from Google Drive
 - 🎨 **Beautiful File Browser**: Interactive table with checkboxes and gradient styling
 - 👥 **Non-Technical Friendly**: Anyone can use it - no coding required
 - ⚡ **Simple Workflow**: Browse → Select → Copy → Paste → Download
-- 🔐 **Secure**: Uses Databricks secrets for Google Drive credentials
-- 💾 **Flexible Storage**: Save to Unity Catalog Volumes or DBFS (auto-detected)
 - 📊 **Multiple File Types**: Supports Google Workspace files (Docs, Sheets, Slides) and regular files
 - 📈 **Progress Tracking**: Real-time download progress with visual summaries
+
+### Upload to Google Drive
+- 📤 **Export Delta Tables**: Upload any Delta table to Google Drive as CSV or Parquet
+- 🎯 **Row Limiting**: Export full tables or just a subset of rows
+- 🔗 **Direct Links**: Get Google Drive links to uploaded files
+- 💾 **Two Formats**: Export as CSV (for sharing) or Parquet (for data professionals)
+
+### Technical Features
+- 🔐 **Secure**: Uses Databricks secrets for Google Drive credentials
+- 💾 **Flexible Storage**: Save to Unity Catalog Volumes or DBFS (auto-detected)
 - 🌈 **Modern UI**: Gradient styling, hover effects, clean design
 - ⚡ **Zero-Temp-File Architecture**: Direct writes to destination (no `/tmp` usage)
 - 🔧 **Modular Design**: All Python functions in `google_drive_utils.py` module for developers
@@ -165,6 +174,26 @@ df.write.format("delta").mode("overwrite").saveAsTable("main.default.sales_repor
 # Or access from DBFS
 df = spark.read.csv("dbfs:/mnt/data/report.csv", header=True, inferSchema=True)
 ```
+
+### Step 5: Export Delta Tables to Google Drive (Optional)
+
+Upload processed data back to Google Drive:
+
+```python
+# In the "Export Delta Table" cell:
+TABLE_NAME = "main.default.sales_data"
+OUTPUT_FILE_NAME = "monthly_sales_report"
+EXPORT_FORMAT = "csv"  # or "parquet"
+MAX_ROWS = 10000  # Optional: limit rows
+
+# Run the cell - that's it!
+```
+
+**Use cases:**
+- Share analysis results with non-Databricks users
+- Distribute reports via Google Drive
+- Backup important tables
+- Export data for external tools
 
 ## File Type Support
 

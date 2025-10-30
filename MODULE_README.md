@@ -92,6 +92,68 @@ dest = download_file_to_destination(
 print(f"Downloaded to: {dest}")
 ```
 
+### File Upload
+
+#### `upload_file_to_google_drive(service, local_file_path, file_name, folder_id=None, mime_type='text/csv')`
+Uploads a file from local filesystem to Google Drive.
+
+**Parameters:**
+- `service`: Google Drive service object
+- `local_file_path` (str): Path to local file (e.g., `/dbfs/tmp/file.csv`)
+- `file_name` (str): Name for the file in Google Drive
+- `folder_id` (str, optional): Google Drive folder ID to upload to (None for root)
+- `mime_type` (str, optional): MIME type of the file (default: 'text/csv')
+
+**Returns:**
+- str: File ID of the uploaded file
+
+**Example:**
+```python
+from google_drive_utils import upload_file_to_google_drive
+
+file_id = upload_file_to_google_drive(
+    service,
+    local_file_path="/dbfs/tmp/report.csv",
+    file_name="monthly_report.csv",
+    folder_id="abc123",
+    mime_type="text/csv"
+)
+print(f"Uploaded file ID: {file_id}")
+```
+
+### Delta Table Export
+
+#### `export_table_to_google_drive(spark, service, table_name, output_file_name, folder_id=None, file_format='csv', max_rows=None)`
+Exports a Delta table to Google Drive as CSV or Parquet.
+
+**Parameters:**
+- `spark`: Spark session
+- `service`: Google Drive service object
+- `table_name` (str): Full table name (e.g., 'catalog.schema.table')
+- `output_file_name` (str): Name for the file in Google Drive
+- `folder_id` (str, optional): Google Drive folder ID to upload to (None for root)
+- `file_format` (str, optional): Export format - 'csv' or 'parquet' (default: 'csv')
+- `max_rows` (int, optional): Maximum number of rows to export (None for all)
+
+**Returns:**
+- str: File ID of the uploaded file
+
+**Example:**
+```python
+from google_drive_utils import export_table_to_google_drive
+
+file_id = export_table_to_google_drive(
+    spark,
+    service,
+    table_name="main.default.sales_data",
+    output_file_name="sales_report",
+    folder_id="abc123",
+    file_format="csv",
+    max_rows=10000
+)
+print(f"Exported to Google Drive: {file_id}")
+```
+
 ### Helper Functions
 
 #### `format_file_size(size_bytes)`

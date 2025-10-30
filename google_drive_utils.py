@@ -57,7 +57,8 @@ def get_google_drive_service(dbutils, secret_scope: str, credentials_key: str):
         credentials_dict = json.loads(credentials_json)
         
         # Define the required scopes
-        SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+        # Note: If you want to upload files to Google Drive, use 'drive' instead of 'drive.readonly'
+        SCOPES = ['https://www.googleapis.com/auth/drive']
         
         # Create credentials object
         credentials = service_account.Credentials.from_service_account_info(
@@ -374,4 +375,186 @@ def validate_destination_path(dbutils, dest_path: str) -> bool:
     except Exception as e:
         print(f"Path validation failed: {e}")
         return False
+
+
+def upload_file_to_google_drive(
+    service,
+    local_file_path: str,
+    file_name: str,
+    folder_id: Optional[str] = None,
+    mime_type: str = 'text/csv'
+):
+    """
+    Upload a file from local filesystem to Google Drive.
+    
+    Args:
+        service: Google Drive service object
+        local_file_path: Path to the file to upload (e.g., /dbfs/tmp/file.csv)
+        file_name: Name for the file in Google Drive
+        folder_id: Google Drive folder ID to upload to (None for root)
+        mime_type: MIME type of the file (default: text/csv)
+        
+    Returns:
+        File ID of the uploaded file
+        
+    Raises:
+        Exception: If upload fails
+    """
+    try:
+        from googleapiclient.http import MediaFileUpload
+        
+        # Prepare file metadata
+        file_metadata = {'name': file_name}
+        if folder_id:
+            file_metadata['parents'] = [folder_id]
+        
+        # Create media upload
+        media = MediaFileUpload(local_file_path, mimetype=mime_type, resumable=True)
+        
+        # Upload file
+        print(f"  Uploading {file_name} to Google Drive...")
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id,name,size,webViewLink'
+        ).execute()
+        
+        file_id = file.get('id')
+        file_size = int(file.get('size', 0))
+        file_size_mb = file_size / (1024 * 1024)
+        web_link = file.get('webViewLink')
+        
+        print(f"  ✓ Uploaded successfully!")
+        print(f"    File ID: {file_id}")
+        print(f"    Size: {file_size_mb:.2f} MB")
+        print(f"    Link: {web_link}")
+        
+        return file_id
+        
+    except Exception as e:
+        print(f"  ✗ Upload failed: {str(e)}")
+        raise
+
+
+def export_table_to_google_drive(
+    spark,
+    service,
+    table_name: str,
+    output_file_name: str,
+    folder_id: Optional[str] = None,
+    file_format: str = 'csv',
+    max_rows: Optional[int] = None
+) -> str:
+    """
+    Export a Delta table to Google Drive as CSV or Parquet.
+    
+    Args:
+        spark: Spark session
+        service: Google Drive service object
+        table_name: Full table name (e.g., 'catalog.schema.table')
+        output_file_name: Name for the file in Google Drive
+        folder_id: Google Drive folder ID to upload to (None for root)
+        file_format: Export format ('csv' or 'parquet')
+        max_rows: Maximum number of rows to export (None for all)
+        
+    Returns:
+        File ID of the uploaded file
+        
+    Raises:
+        Exception: If export/upload fails
+    """
+    try:
+        print(f"📊 Exporting table: {table_name}")
+        
+        # Read the table
+        df = spark.table(table_name)
+        
+        # Limit rows if specified
+        if max_rows:
+            df = df.limit(max_rows)
+            print(f"  Limited to {max_rows:,} rows")
+        
+        row_count = df.count()
+        print(f"  Rows to export: {row_count:,}")
+        
+        # Create temporary export path
+        import uuid
+        temp_id = str(uuid.uuid4())[:8]
+        temp_path = f"/tmp/google_drive_export_{temp_id}"
+        
+        # Export to local temp file
+        print(f"  Exporting to temporary file...")
+        
+        if file_format.lower() == 'csv':
+            # Export as single CSV file
+            temp_export = f"{temp_path}.csv"
+            df.coalesce(1).write.mode("overwrite").option("header", "true").csv(temp_path)
+            
+            # Find the actual CSV file (Spark creates a directory with part files)
+            import os
+            csv_files = [f for f in os.listdir(temp_path) if f.startswith('part-') and f.endswith('.csv')]
+            if csv_files:
+                actual_csv = os.path.join(temp_path, csv_files[0])
+                # Move to final name
+                os.rename(actual_csv, temp_export)
+                # Clean up directory
+                import shutil
+                shutil.rmtree(temp_path)
+            else:
+                raise Exception("CSV export failed - no output file found")
+            
+            mime_type = 'text/csv'
+            final_temp_path = temp_export
+            
+        elif file_format.lower() == 'parquet':
+            # Export as single Parquet file
+            temp_export = f"{temp_path}.parquet"
+            df.coalesce(1).write.mode("overwrite").parquet(temp_path)
+            
+            # Find the actual Parquet file
+            import os
+            parquet_files = [f for f in os.listdir(temp_path) if f.startswith('part-') and f.endswith('.parquet')]
+            if parquet_files:
+                actual_parquet = os.path.join(temp_path, parquet_files[0])
+                # Move to final name
+                os.rename(actual_parquet, temp_export)
+                # Clean up directory
+                import shutil
+                shutil.rmtree(temp_path)
+            else:
+                raise Exception("Parquet export failed - no output file found")
+            
+            mime_type = 'application/octet-stream'
+            final_temp_path = temp_export
+            
+        else:
+            raise ValueError(f"Unsupported format: {file_format}. Use 'csv' or 'parquet'")
+        
+        print(f"  ✓ Export complete")
+        
+        # Ensure file name has correct extension
+        if not output_file_name.endswith(f'.{file_format}'):
+            output_file_name = f"{output_file_name}.{file_format}"
+        
+        # Upload to Google Drive
+        print(f"\n📤 Uploading to Google Drive...")
+        file_id = upload_file_to_google_drive(
+            service,
+            final_temp_path,
+            output_file_name,
+            folder_id,
+            mime_type
+        )
+        
+        # Clean up temp file
+        import os
+        if os.path.exists(final_temp_path):
+            os.remove(final_temp_path)
+            print(f"  ✓ Cleaned up temporary file")
+        
+        return file_id
+        
+    except Exception as e:
+        print(f"✗ Export failed: {str(e)}")
+        raise
 
