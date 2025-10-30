@@ -5,6 +5,7 @@ This project provides a Databricks notebook interface for ingesting data from Go
 ## ✨ Features
 
 - 🎨 **Visual File Browser**: Interactive HTML table with checkboxes for easy file selection
+- ⚡ **Quick Download**: Copy file IDs and paste into Quick Download Helper cell for immediate ingestion
 - 🔐 **Secure Authentication**: Uses Databricks secrets for Google Drive credentials
 - 💾 **Flexible Storage**: Save to Unity Catalog Volumes or DBFS
 - ✅ **Interactive Selection**: Click checkboxes and copy file IDs with one button
@@ -12,7 +13,8 @@ This project provides a Databricks notebook interface for ingesting data from Go
 - 📈 **Progress Tracking**: Real-time download and ingestion progress with visual summaries
 - 🎯 **Widget Interface**: Easy-to-use parameter widgets for configuration
 - 🌈 **Beautiful UI**: Gradient styling, hover effects, and modern design
-- ⚡ **Zero-Temp-File Architecture**: True direct writes to DBFS/Volumes with zero `/tmp` usage, automatic path conversion for seamless operation
+- ⚡ **Zero-Temp-File Architecture**: True direct writes to DBFS/Volumes with zero `/tmp` usage, automatic path conversion
+- 🔧 **Modular Design**: Core functions extracted into `google_drive_utils.py` module for reusability
 
 ## Setup Instructions
 

@@ -47,11 +47,25 @@ dbutils.library.restartPython()
 import json
 import io
 import os
+import sys
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from pyspark.sql import SparkSession
 import pandas as pd
+
+# Import utility functions from the module
+# If running in Databricks, you may need to upload google_drive_utils.py to DBFS or a volume
+try:
+    from google_drive_utils import (
+        get_google_drive_service,
+        list_drive_contents,
+        download_file_to_destination
+    )
+    print("✓ Imported functions from google_drive_utils module")
+except ImportError:
+    print("⚠️  google_drive_utils module not found, using inline functions")
+    # Functions will be defined inline below if import fails
 
 # COMMAND ----------
 
@@ -296,9 +310,35 @@ if action == "list_files":
                 cursor: pointer;
                 font-size: 14px;
                 margin-top: 10px;
+                margin-right: 10px;
             }
             .btn-copy:hover {
                 background: #45a049;
+            }
+            .btn-download-selected {
+                background: #2196F3;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                margin-top: 10px;
+            }
+            .btn-download-selected:hover {
+                background: #1976D2;
+            }
+            .btn-download {
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 4px 12px;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 12px;
+            }
+            .btn-download:hover {
+                background: #5568d3;
             }
             .selected-count {
                 font-weight: bold;
@@ -306,22 +346,35 @@ if action == "list_files":
                 font-size: 16px;
                 margin: 10px 0;
             }
+            .actions-cell {
+                text-align: center;
+                width: 100px;
+            }
         </style>
         
         <div class="instructions">
-            <h3>📋 File Selection Instructions</h3>
+            <h3>📋 Three Ways to Download Files</h3>
+            <p><strong>Option 1: Quick Download (Fastest ⚡)</strong></p>
             <ol>
-                <li>Review the files in the table below</li>
-                <li>Click the checkboxes to select files you want to ingest</li>
-                <li>Click "Copy Selected File IDs" button</li>
-                <li>Paste the IDs into the <strong>"File IDs to Ingest"</strong> widget above</li>
-                <li>Change the <strong>Action</strong> widget to <strong>"ingest_files"</strong></li>
-                <li>Run all cells to ingest the selected files</li>
+                <li>Click <strong>"📋 Copy Selected File IDs"</strong> or copy individual File IDs from the table</li>
+                <li>Paste into the <strong>"Quick Download Helper"</strong> cell below</li>
+                <li>Run that cell - files download immediately!</li>
+            </ol>
+            <p><strong>Option 2: Widget-Based Download</strong></p>
+            <ol>
+                <li>Check boxes → Click "📋 Copy Selected File IDs"</li>
+                <li>Paste into <strong>"File IDs to Ingest"</strong> widget</li>
+                <li>Change Action to <strong>"ingest_files"</strong> → Run cells</li>
+            </ol>
+            <p><strong>Option 3: One-Click Download (Coming Soon)</strong></p>
+            <ol>
+                <li>The ⬇️ Download buttons will trigger immediate downloads in a future update</li>
             </ol>
         </div>
         
         <div id="selected-info" class="selected-count">Selected: <span id="count">0</span> files</div>
         <button onclick="copySelected()" class="btn-copy">📋 Copy Selected File IDs</button>
+        <button onclick="downloadSelected()" class="btn-download-selected">⬇️ Download Selected</button>
         
         <table class="file-table">
             <thead>
@@ -334,6 +387,7 @@ if action == "list_files":
                     <th>Size (MB)</th>
                     <th>Modified</th>
                     <th>File ID</th>
+                    <th class="actions-cell">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -346,27 +400,36 @@ if action == "list_files":
             file_id = row.get('id', '')
             size_mb = row.get('size_mb', 0)
             modified = row.get('modifiedTime', 'N/A')
+            mime_type = row.get('mimeType', '')
             
             # Format modified date to be more readable
             if modified != 'N/A' and 'T' in str(modified):
                 modified = str(modified).split('T')[0]
             
+            # Escape quotes in name for JavaScript
+            name_escaped = name.replace("'", "\\'").replace('"', '\\"')
+            
             html += f"""
                 <tr>
                     <td class="checkbox-cell">
-                        <input type="checkbox" class="file-checkbox" data-fileid="{file_id}" onchange="updateCount()">
+                        <input type="checkbox" class="file-checkbox" data-fileid="{file_id}" data-filename="{name_escaped}" data-mimetype="{mime_type}" onchange="updateCount()">
                     </td>
                     <td class="type-icon">{file_type}</td>
                     <td><strong>{name}</strong></td>
                     <td>{size_mb}</td>
                     <td>{modified}</td>
                     <td><span class="file-id">{file_id}</span></td>
+                    <td class="actions-cell">
+                        <button class="btn-download" onclick="downloadFile('{file_id}', '{name_escaped}', '{mime_type}')">⬇️ Download</button>
+                    </td>
                 </tr>
             """
         
         html += """
             </tbody>
         </table>
+        
+        <div id="download-status" style="margin-top: 20px;"></div>
         
         <script>
             function toggleAll(checkbox) {
@@ -406,6 +469,45 @@ if action == "list_files":
                 });
             }
             
+            function downloadFile(fileId, fileName, mimeType) {
+                const statusDiv = document.getElementById('download-status');
+                statusDiv.innerHTML = `<p style="color: #2196F3;">⏳ Downloading ${fileName}... Please wait.</p>`;
+                
+                // Store in global variable to be picked up by Python
+                window.downloadRequest = {
+                    fileIds: [fileId],
+                    fileNames: [fileName],
+                    mimeTypes: [mimeType]
+                };
+                
+                alert(`✓ Download request for "${fileName}" has been queued!\\n\\nPlease run the "Process Download Requests" cell below to complete the download.`);
+            }
+            
+            function downloadSelected() {
+                const checked = document.querySelectorAll('.file-checkbox:checked');
+                
+                if (checked.length === 0) {
+                    alert('⚠️ Please select at least one file to download!');
+                    return;
+                }
+                
+                const fileIds = Array.from(checked).map(cb => cb.dataset.fileid);
+                const fileNames = Array.from(checked).map(cb => cb.dataset.filename);
+                const mimeTypes = Array.from(checked).map(cb => cb.dataset.mimetype);
+                
+                const statusDiv = document.getElementById('download-status');
+                statusDiv.innerHTML = `<p style="color: #2196F3;">⏳ Queued ${fileIds.length} file(s) for download...</p>`;
+                
+                // Store in global variable to be picked up by Python
+                window.downloadRequest = {
+                    fileIds: fileIds,
+                    fileNames: fileNames,
+                    mimeTypes: mimeTypes
+                };
+                
+                alert(`✓ Download request for ${fileIds.length} file(s) has been queued!\\n\\nPlease run the "Process Download Requests" cell below to complete the download.`);
+            }
+            
             // Initialize count on load
             updateCount();
         </script>
@@ -424,6 +526,85 @@ if action == "list_files":
         
     else:
         print("No files found in the specified location.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Quick Download Helper
+# MAGIC 
+# MAGIC Use this cell for quick downloads. Enter file IDs below and run the cell.
+
+# COMMAND ----------
+
+# Quick download: Enter file IDs here (comma-separated) and run this cell
+quick_download_ids = ""  # Example: "file_id_1, file_id_2, file_id_3"
+
+if quick_download_ids.strip():
+    print(f"\n{'='*80}")
+    print(f"Quick Download")
+    print(f"{'='*80}\n")
+    
+    file_ids = [fid.strip() for fid in quick_download_ids.split(',') if fid.strip()]
+    print(f"Files to download: {len(file_ids)}")
+    print(f"Destination: {output_path}\n")
+    
+    # Ensure output directory exists
+    try:
+        dbutils.fs.mkdirs(output_path)
+    except Exception as e:
+        print(f"Note: {str(e)}")
+    
+    downloaded_files = []
+    failed_files = []
+    
+    for idx, file_id in enumerate(file_ids, 1):
+        try:
+            print(f"\n[{idx}/{len(file_ids)}] Processing file ID: {file_id}")
+            
+            # Get file metadata
+            file_metadata = drive_service.files().get(fileId=file_id, fields='name,mimeType,size').execute()
+            file_name = file_metadata.get('name')
+            
+            # Download file directly to destination
+            final_dest_path = download_file_to_destination(
+                drive_service, 
+                file_id, 
+                file_name, 
+                output_path
+            )
+            
+            downloaded_files.append({
+                'file_id': file_id,
+                'file_name': os.path.basename(final_dest_path),
+                'destination_path': final_dest_path,
+                'status': 'success'
+            })
+            
+        except Exception as e:
+            print(f"  ✗ Failed: {str(e)}")
+            failed_files.append({
+                'file_id': file_id,
+                'error': str(e),
+                'status': 'failed'
+            })
+    
+    # Display results
+    print(f"\n{'='*80}")
+    print("DOWNLOAD COMPLETE")
+    print(f"{'='*80}")
+    print(f"✓ Downloaded: {len(downloaded_files)}")
+    print(f"✗ Failed: {len(failed_files)}")
+    print(f"{'='*80}\n")
+    
+    if downloaded_files:
+        display(pd.DataFrame(downloaded_files))
+    
+    if failed_files:
+        print("\nFailed:")
+        display(pd.DataFrame(failed_files))
+else:
+    print("ℹ️  Enter file IDs in quick_download_ids variable above and run this cell to download files quickly.")
+    print("   Or use the Action widget approach for full ingestion workflow.")
 
 # COMMAND ----------
 

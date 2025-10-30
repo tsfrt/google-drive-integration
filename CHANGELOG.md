@@ -2,6 +2,40 @@
 
 All notable changes to the Google Drive to Databricks ingestion project.
 
+## [2.2.0] - 2024-10-29
+
+### 🔧 Modular Architecture & Quick Download
+
+#### Added
+- **Modular Design**: Extracted all core functions into `google_drive_utils.py` module
+- **Quick Download Helper**: New cell for immediate file downloads without widget configuration
+- **Download Buttons**: Added download buttons in the visual file browser (UI foundation for future enhancements)
+- **MODULE_README.md**: Complete documentation for the utility module
+
+#### Changed
+- **Notebook Structure**: Now imports from `google_drive_utils` module (falls back to inline if not available)
+- **File Browser UI**: Enhanced with action buttons and updated instructions for quick downloads
+- **User Workflow**: Three options now available:
+  1. Quick Download (copy IDs → paste → run cell)
+  2. Widget-based (traditional workflow)
+  3. One-click buttons (coming in future update)
+
+#### Module Functions
+- `get_google_drive_service()` - Authentication
+- `list_drive_contents()` - File listing with DataFrame output
+- `download_file_to_destination()` - Direct file download
+- `format_file_size()` - Human-readable file sizes
+- `get_file_export_format()` - Export format detection
+- `validate_destination_path()` - Path validation
+
+#### Benefits
+- ✅ **Faster workflow**: Quick Download cell bypasses widget configuration
+- ✅ **Reusability**: Module functions can be used in other notebooks/scripts
+- ✅ **Maintainability**: Single source of truth for Google Drive operations
+- ✅ **Testability**: Functions can be unit tested independently
+
+---
+
 ## [2.1.0] - 2024-10-29
 
 ### 🎯 True Zero-Temp-File Implementation
