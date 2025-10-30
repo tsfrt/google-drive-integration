@@ -2,6 +2,36 @@
 
 All notable changes to the Google Drive to Databricks ingestion project.
 
+## [3.2.0] - 2024-10-30
+
+### 🚀 True Zero-Temp Export with Memory Buffers
+
+#### Changed
+- **Export function rewritten**: `export_table_to_google_drive()` now exports directly from memory buffers
+  - Eliminates all `/tmp` file system writes
+  - Converts Spark DataFrame → Pandas → in-memory buffer → Google Drive
+  - No temporary file creation or cleanup needed
+- **New buffer upload function**: `upload_buffer_to_google_drive()` uploads directly from `BytesIO` buffers using `MediaIoBaseUpload`
+- **Better memory management**: Explicit buffer lifecycle with size reporting
+
+#### Technical Flow
+```python
+# Old approach (v3.1)
+Spark DataFrame → /tmp/file.csv → Upload → Cleanup
+
+# New approach (v3.2)
+Spark DataFrame → Pandas → BytesIO buffer → Upload → Release buffer
+```
+
+#### Benefits
+- ✅ **Zero temp files**: No `/tmp` usage during export
+- ✅ **Simpler code**: No file cleanup logic needed
+- ✅ **Better errors**: No "file not found" errors from missing temp directories
+- ✅ **Memory efficient**: Buffer released immediately after upload
+- ✅ **Faster**: One less I/O operation (no disk write)
+
+---
+
 ## [3.1.0] - 2024-10-29
 
 ### 📤 Export Delta Tables to Google Drive

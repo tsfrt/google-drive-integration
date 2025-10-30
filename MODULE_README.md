@@ -121,10 +121,43 @@ file_id = upload_file_to_google_drive(
 print(f"Uploaded file ID: {file_id}")
 ```
 
+#### `upload_buffer_to_google_drive(service, file_buffer, file_name, folder_id=None, mime_type='text/csv')`
+Uploads a file directly from a memory buffer to Google Drive (zero temp files).
+
+**Parameters:**
+- `service`: Google Drive service object
+- `file_buffer` (io.BytesIO): BytesIO buffer containing file data
+- `file_name` (str): Name for the file in Google Drive
+- `folder_id` (str, optional): Google Drive folder ID to upload to (None for root)
+- `mime_type` (str, optional): MIME type of the file (default: 'text/csv')
+
+**Returns:**
+- str: File ID of the uploaded file
+
+**Example:**
+```python
+import io
+from google_drive_utils import upload_buffer_to_google_drive
+
+# Create data in memory
+buffer = io.BytesIO()
+buffer.write(b"Column1,Column2\nValue1,Value2\n")
+
+# Upload directly from buffer
+file_id = upload_buffer_to_google_drive(
+    service,
+    file_buffer=buffer,
+    file_name="data.csv",
+    folder_id="abc123",
+    mime_type="text/csv"
+)
+print(f"Uploaded file ID: {file_id}")
+```
+
 ### Delta Table Export
 
 #### `export_table_to_google_drive(spark, service, table_name, output_file_name, folder_id=None, file_format='csv', max_rows=None)`
-Exports a Delta table to Google Drive as CSV or Parquet.
+Exports a Delta table to Google Drive as CSV or Parquet. Uses in-memory buffers for zero-temp-file export.
 
 **Parameters:**
 - `spark`: Spark session
@@ -137,6 +170,13 @@ Exports a Delta table to Google Drive as CSV or Parquet.
 
 **Returns:**
 - str: File ID of the uploaded file
+
+**How it works:**
+1. Reads Spark DataFrame from Delta table
+2. Converts to Pandas DataFrame in memory
+3. Exports to BytesIO buffer (CSV or Parquet)
+4. Uploads directly from buffer to Google Drive
+5. No temporary files created!
 
 **Example:**
 ```python

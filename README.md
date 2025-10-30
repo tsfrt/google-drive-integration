@@ -18,6 +18,7 @@ Perfect for non-technical users who need to browse and download files from Googl
 - 🎯 **Row Limiting**: Export full tables or just a subset of rows
 - 🔗 **Direct Links**: Get Google Drive links to uploaded files
 - 💾 **Two Formats**: Export as CSV (for sharing) or Parquet (for data professionals)
+- ⚡ **Memory-Efficient**: Exports directly from in-memory buffers (no temporary files!)
 
 ### Technical Features
 - 🔐 **Secure**: Uses Databricks secrets for Google Drive credentials
